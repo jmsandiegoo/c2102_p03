@@ -10,7 +10,7 @@ Group #73
 
 /* Write your Trigger Below */
 
--- TRIGGER 1. Drivers cannot be double-booked tested/working: ✅
+-- TRIGGER 1. Drivers cannot be double-booked. tested/working: ✅
 CREATE OR REPLACE FUNCTION check_driver_not_double_booked_func()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -18,7 +18,7 @@ DECLARE
 BEGIN
   -- query and check for existence of driver overlap bookings
   SELECT EXISTS (
-    SELECT 1 FROM Hires h 
+    SELECT 1 FROM Hires h
     WHERE h.eid = NEW.eid
     AND (
       NEW.fromdate BETWEEN h.fromdate AND h.todate
@@ -36,11 +36,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER check_driver_not_double_booked
+CREATE OR REPLACE TRIGGER check_driver_not_double_booked
 BEFORE INSERT ON Hires
 FOR EACH ROW EXECUTE FUNCTION check_driver_not_double_booked_func();
 
--- TRIGGER 2. Cars (ie CarDetails) cannot be double-booked.
+-- TRIGGER 2. (TODO) Cars (ie CarDetails) cannot be double-booked.
 CREATE OR REPLACE FUNCTION check_car_not_double_booked_func() RETURNS TRIGGER AS $$
 DECLARE
     overlapping_count INT;
@@ -59,11 +59,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER prevent_car_double_booking
+CREATE OR REPLACE TRIGGER prevent_car_double_booking
 BEFORE INSERT ON Assigns
 FOR EACH ROW EXECUTE FUNCTION check_car_not_double_booked_func();
 
--- TRIGGER 3. During handover, the employee must be located in the same location the booking is for.
+-- TRIGGER 3. (TODO) During handover, the employee must be located in the same location the booking is for.
 CREATE OR REPLACE FUNCTION check_employee_location() RETURNS TRIGGER AS $$
 DECLARE 
   employee_zip INT
@@ -81,21 +81,21 @@ BEGIN
 IF employee_zip <> booking_zip THEN
   RAISE EXCEPTION 'Employee'
 
-CREATE TRIGGER enforce_employee_location
+CREATE OR REPLACE TRIGGER enforce_employee_location
 BEFORE INSERT ON Handover
 FOR EACH ROW EXECUTE FUNCTION check_employee_location();
 
-
--- TRIGGER 4. Car Details assigned to booking must be same as the car models in that booking tested/working: ✅
+-- TRIGGER 4. Car Details assigned to booking must be same as 
+-- the car models in that booking. tested/working: ✅
 CREATE OR REPLACE FUNCTION check_car_details_models_same_func()
 RETURNS TRIGGER AS $$
 DECLARE
   is_same BOOLEAN;
-  assigned_brand TEXT;
-  assigned_model TEXT;
+  assign_brand TEXT;
+  assign_model TEXT;
 BEGIN
   -- get the (brand, model) of the plate
-  SELECT cd.brand, cd.model INTO assigned_brand, assigned_model
+  SELECT cd.brand, cd.model INTO assign_brand, assign_model
   FROM CarDetails cd
   WHERE cd.plate = NEW.plate;
 
@@ -109,8 +109,8 @@ BEGIN
     SELECT 1
     FROM Bookings b
     WHERE b.bid = NEW.bid
-    AND b.brand = assigned_brand
-    AND b.model = assigned_model
+    AND b.brand = assign_brand
+    AND b.model = assign_model
   ) INTO is_same;
 
   IF NOT is_same THEN
@@ -122,9 +122,50 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER check_car_details_models_same
+CREATE OR REPLACE TRIGGER check_car_details_models_same
 BEFORE INSERT ON Assigns
 FOR EACH ROW EXECUTE FUNCTION check_car_details_models_same_func();
+
+-- TRIGGER 5. Assigned car details to booking must be parked at same location as booking for.
+-- test/working: ✅
+CREATE OR REPLACE FUNCTION check_car_parked_same_loc_func()
+RETURNS TRIGGER AS $$
+DECLARE
+  assign_zip INT;
+  booking_zip INT;
+BEGIN
+  -- get the zip of the car assigned
+  SELECT cd.zip INTO assign_zip
+  FROM CarDetails cd
+  WHERE cd.plate = NEW.plate;
+
+  IF NOT FOUND THEN
+    RAISE NOTICE 'Car Details w/ plate % could not be found', NEW.plate;
+    RETURN NULL;
+  END IF;
+
+  -- get the zip of the booking
+  SELECT b.zip INTO booking_zip
+  FROM Bookings b
+  WHERE b.bid = NEW.bid;
+
+  IF NOT FOUND THEN
+    RAISE NOTICE 'Booking w/ bid % could not be found', NEW.bid;
+    RETURN NULL;
+  END IF;
+
+  IF assign_zip <> booking_zip THEN
+    RAISE NOTICE 'Car assigned not parked at the booking zip location';
+    RETURN NULL;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER check_car_parked_same_loc
+BEFORE INSERT ON Assigns
+FOR EACH ROW EXECUTE FUNCTION check_car_parked_same_loc_func();
 
 /*
   Write your Routines Below
