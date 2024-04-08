@@ -194,16 +194,20 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
--- PROCEDURE 2
+-- PROCEDURE 2 test/working: ✅
 CREATE OR REPLACE PROCEDURE add_car (
   brand   TEXT   , model  TEXT   , capacity INT  ,
   deposit NUMERIC, daily  NUMERIC,
   plates  TEXT[] , colors TEXT[] , pyears   INT[], zips INT[]
 ) AS $$
--- add declarations here
 BEGIN
-  -- your code here
+  INSERT INTO CarModels (brand, model, capacity, deposit, daily)
+  VALUES (brand, model, capacity, deposit, daily);
+
+  FOR i IN 1 .. array_upper(plates, 1) LOOP
+      INSERT INTO CarDetails (plate, color, pyear, brand, model, zip) 
+      VALUES (plates[i], colors[i], pyears[i], brand, model, zips[i]);
+  END LOOP;
 END;
 $$ LANGUAGE plpgsql;
 

@@ -178,3 +178,9 @@ CALL add_employees(
   ARRAY[12345, 12345, 12345]::integer[],
   ARRAY['PDVL123', NULL, 'PDVL456']
 );
+
+-- procedure 2 test
+CALL add_car(
+  'Toyota', 'Prius', 5, 200.00, 50.00, 
+  ARRAY['ABC4200', 'ABC4201'], ARRAY['Grey', 'White'], 
+  ARRAY[2021, 2022], ARRAY[12345, 67890]);
