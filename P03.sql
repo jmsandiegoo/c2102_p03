@@ -11,10 +11,6 @@ Group #73
 /* Write your Trigger Below */
 
 -- TRIGGER 1. Drivers cannot be double-booked tested/working: ✅
-CREATE TRIGGER check_driver_not_double_booked
-BEFORE INSERT ON Hires
-FOR EACH ROW EXECUTE FUNCTION check_driver_not_double_booked_func();
-
 CREATE OR REPLACE FUNCTION check_driver_not_double_booked_func()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -40,12 +36,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+CREATE TRIGGER check_driver_not_double_booked
+BEFORE INSERT ON Hires
+FOR EACH ROW EXECUTE FUNCTION check_driver_not_double_booked_func();
+
 -- TRIGGER 2. Cars (ie CarDetails) cannot be double-booked.
-
-CREATE TRIGGER prevent_car_double_booking
-BEFORE INSERT ON Assigns
-FOR EACH ROW EXECUTE FUNCTION check_car_not_double_booked_func();
-
 CREATE OR REPLACE FUNCTION check_car_not_double_booked_func() RETURNS TRIGGER AS $$
 DECLARE
     overlapping_count INT;
@@ -64,11 +59,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- TRIGGER 3. During handover, the employee must be located in the same location the booking is for.
-CREATE TRIGGER enforce_employee_location
-BEFORE INSERT ON Handover
-FOR EACH ROW EXECUTE FUNCTION check_employee_location();
+CREATE TRIGGER prevent_car_double_booking
+BEFORE INSERT ON Assigns
+FOR EACH ROW EXECUTE FUNCTION check_car_not_double_booked_func();
 
+-- TRIGGER 3. During handover, the employee must be located in the same location the booking is for.
 CREATE OR REPLACE FUNCTION check_employee_location() RETURNS TRIGGER AS $$
 DECLARE 
   employee_zip INT
@@ -86,14 +81,50 @@ BEGIN
 IF employee_zip <> booking_zip THEN
   RAISE EXCEPTION 'Employee'
 
+CREATE TRIGGER enforce_employee_location
+BEFORE INSERT ON Handover
+FOR EACH ROW EXECUTE FUNCTION check_employee_location();
 
 
+-- TRIGGER 4. Car Details assigned to booking must be same as the car models in that booking tested/working: ✅
+CREATE OR REPLACE FUNCTION check_car_details_models_same_func()
+RETURNS TRIGGER AS $$
+DECLARE
+  is_same BOOLEAN;
+  assigned_brand TEXT;
+  assigned_model TEXT;
+BEGIN
+  -- get the (brand, model) of the plate
+  SELECT cd.brand, cd.model INTO assigned_brand, assigned_model
+  FROM CarDetails cd
+  WHERE cd.plate = NEW.plate;
 
+  IF NOT FOUND THEN
+    RAISE NOTICE 'Car Details w/ plate % could not be found', NEW.plate;
+    RETURN NULL;
+  END IF;
 
+  -- check if it is assigned model, brand is the same with the respective bookings
+  SELECT EXISTS (
+    SELECT 1
+    FROM Bookings b
+    WHERE b.bid = NEW.bid
+    AND b.brand = assigned_brand
+    AND b.model = assigned_model
+  ) INTO is_same;
 
+  IF NOT is_same THEN
+    RAISE NOTICE 'Assign car model is not the same as the booking car model';
+    RETURN NULL;
+  END IF;
 
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
-
+CREATE TRIGGER check_car_details_models_same
+BEFORE INSERT ON Assigns
+FOR EACH ROW EXECUTE FUNCTION check_car_details_models_same_func();
 
 /*
   Write your Routines Below

@@ -138,7 +138,7 @@ INSERT INTO CarDetails (plate, color, pyear, brand, model, zip) VALUES
 INSERT INTO Bookings (bid, sdate, days, email, ccnum, bdate, brand, model, zip) VALUES
 (1, '2024-04-10', 7, 'john.doe@example.com', '1111222233334444', '2024-04-01', 'Toyota', 'Corolla', 12345),
 (2, '2024-05-15', 5, 'jane.doe@example.com', '5555666677778888', '2024-05-10', 'Honda', 'Civic', 67890),
-;
+(3, '2024-06-16', 5, 'jane.doe@example.com', '5555666677778888', '2024-06-09', 'Honda', 'Civic', 67890);
 
 INSERT INTO Assigns (bid, plate) VALUES
 (1, 'SJD1234'),
@@ -157,7 +157,7 @@ INSERT INTO Hires (bid, eid, fromdate, todate, ccnum) VALUES
 (1, 1, '2024-04-10', '2024-04-17', '1111222233334444'),
 (2, 2, '2024-05-15', '2024-05-20', '5555666677778888');
 
--- double booking test
+-- trigger 1 double booking test
 INSERT INTO Hires (bid, eid, fromdate, todate, ccnum) VALUES
 (3, 1, '2024-01-03', '2024-01-05', '1111222233334444'),
 (4, 1, '2024-01-05', '2024-01-06', '1111222233334444'),
@@ -165,3 +165,7 @@ INSERT INTO Hires (bid, eid, fromdate, todate, ccnum) VALUES
 (6, 1, '2024-01-02', '2024-01-06', '1111222233334444'),
 (7, 1, '2024-01-06', '2024-01-07', '1111222233334444');
 
+
+-- trigger 4 test
+INSERT INTO Assigns (bid, plate) VALUES
+(3, 'SJD1234');
