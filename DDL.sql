@@ -169,3 +169,12 @@ INSERT INTO Hires (bid, eid, fromdate, todate, ccnum) VALUES
 -- trigger 4 test
 INSERT INTO Assigns (bid, plate) VALUES
 (3, 'SJD1234');
+
+-- procedure 1 test
+CALL add_employees(
+  ARRAY[3, 4, 5],
+  ARRAY['John Doe', 'Jane Smith', 'Steve Brown'],
+  ARRAY[80000003, 80000004, 80000005],
+  ARRAY[12345, 12345, 12345]::integer[],
+  ARRAY['PDVL123', NULL, 'PDVL456']
+);

@@ -175,13 +175,22 @@ FOR EACH ROW EXECUTE FUNCTION check_car_parked_same_loc_func();
     that are incomplete), you may get 0 mark for P03.
 */
 
--- PROCEDURE 1
+-- PROCEDURE 1 test/working: ✅
 CREATE OR REPLACE PROCEDURE add_employees (
   eids INT[], enames TEXT[], ephones INT[], zips INT[], pdvls TEXT[]
 ) AS $$
--- add declarations here
 BEGIN
-  -- your code here
+  FOR i IN 1 .. array_upper(eids, 1) LOOP
+    INSERT INTO Employees (eid, ename, ephone, zip)
+    VALUES (eids[i], enames[i], ephones[i], zips[i]);
+
+    IF pdvls[i] IS NULL THEN
+      CONTINUE;
+    END IF;
+
+    INSERT INTO Drivers (eid, pdvl)
+    VALUES (eids[i], pdvls[i]);
+  END LOOP;
 END;
 $$ LANGUAGE plpgsql;
 
