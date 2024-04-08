@@ -138,11 +138,21 @@ INSERT INTO CarDetails (plate, color, pyear, brand, model, zip) VALUES
 INSERT INTO Bookings (bid, sdate, days, email, ccnum, bdate, brand, model, zip) VALUES
 (1, '2024-04-10', 7, 'john.doe@example.com', '1111222233334444', '2024-04-01', 'Toyota', 'Corolla', 12345),
 (2, '2024-05-15', 5, 'jane.doe@example.com', '5555666677778888', '2024-05-10', 'Honda', 'Civic', 67890),
+(3, '2024-05-15', 5, 'jane.doe@example.com', '5555666677778888', '2024-05-10', 'Honda', 'Civic', 67890),
+(4, '2024-05-15', 5, 'jane.doe@example.com', '5555666677778888', '2024-05-10', 'Honda', 'Civic', 67890),
+(5, '2024-05-15', 5, 'jane.doe@example.com', '5555666677778888', '2024-05-10', 'Honda', 'Civic', 67890),
+(6, '2024-05-15', 5, 'jane.doe@example.com', '5555666677778888', '2024-05-10', 'Honda', 'Civic', 67890),
+(7, '2024-05-15', 5, 'jane.doe@example.com', '5555666677778888', '2024-05-10', 'Honda', 'Civic', 67890)
 ;
 
 INSERT INTO Assigns (bid, plate) VALUES
 (1, 'SJD1234'),
-(2, 'GHD5678');
+(2, 'GHD5678'),
+(3, 'GHD5678'),
+(4, 'GHD5678'),
+(5, 'GHD5678'),
+(6, 'GHD5678'),
+(7, 'GHD5678');
 
 INSERT INTO Handover (bid, eid) VALUES
 (1, 1),

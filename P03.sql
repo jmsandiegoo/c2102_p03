@@ -151,37 +151,157 @@ END;
 $$ LANGUAGE plpgsql;
 
 
--- PROCEDURE 3
+--PROCEDURE 1 Add Employees
+CREATE OR REPLACE PROCEDURE add_employees (
+    eids INT[], 
+    enames TEXT[], 
+    ephones INT[], 
+    zips INT[], 
+    pdvls TEXT[] 
+) AS $$
+DECLARE
+    i INT;
+BEGIN
+    FOR i IN 1..array_length(eids, 1)
+    LOOP
+        INSERT INTO Employee (eid, ename, ephone, zip) 
+        VALUES (eids[i], enames[i], ephones[i], zips[i]);
+
+        IF pdvls[i] IS NOT NULL THEN
+            INSERT INTO Driver (eid, pdvl) 
+            VALUES (eids[i], pdvls[i]);
+        END IF;
+    END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+
+--PROCEDURE 2 Add Car Model
+CREATE OR REPLACE PROCEDURE add_car (
+    brand TEXT , model TEXT , capacity INT,
+    deposit NUMERIC , daily NUMERIC ,
+    plates TEXT[] , colors TEXT[] , pyears INT[], zips INT[] ) AS $$
+DECLARE
+    i INT;
+BEGIN
+    INSERT INTO CarModel (brand, model, capacity, deposit, daily) 
+    VALUES (brand, model, capacity, deposit, daily);
+
+    FOR i IN 1..array_length(plates, 1)
+    LOOP
+        INSERT INTO CarDetails (plate, color, pyear, brand, model, zip) 
+        VALUES (plates[i], colors[i], pyears[i], brand, model, zips[i],);
+    END LOOP;
+END;
+$$ LANGUAGE plpgsql;
+
+-- PROCEDURE 3 ## how to calculate cost?
 CREATE OR REPLACE PROCEDURE return_car (
   bid INT, eid INT
 ) AS $$
--- add declarations here
+  booking_record RECORD;
+  car_model_record RECORD;
+  cost NUMERIC;
 BEGIN
-  -- your code here
+    -- Retrieve the booking details
+    SELECT INTO booking_record * FROM Bookings WHERE bid = bid;
+
+  -- Retrieve the car model details
+    SELECT INTO car_model_record * FROM CarModel WHERE brand = booking_record.brand AND model = booking_record.model;
+
+    -- Calculate the cost
+    cost := (car_model_record.daily * booking_record.days) - car_model_record.deposit;
+
+    -- If cost is positive and ccnum is not given, retrieve it from the booking
+    IF cost > 0 AND booking_record.ccnum IS NULL THEN
+        booking_record.ccnum := (SELECT ccnum FROM Bookings WHERE bid = bid);
+    END IF;
+
+    -- Update the Returned table
+    INSERT INTO Returned (bid, eid, ccnum, cost) 
+    VALUES (bid, eid, booking_record.ccnum, cost);
 END;
 $$ LANGUAGE plpgsql;
 
 
 -- PROCEDURE 4
-CREATE OR REPLACE PROCEDURE auto_assign () AS $$
--- add declarations here
+CREATE OR REPLACE PROCEDURE auto_assign() AS $$
+DECLARE
+    booking_record RECORD;
+    car_details_record RECORD;
 BEGIN
-  -- your code here
+    FOR booking_record IN (
+        SELECT * FROM Bookings 
+        WHERE bid NOT IN (SELECT bid FROM Assigns) 
+        ORDER BY bid ASC
+    ) LOOP
+        FOR car_details_record IN (
+            SELECT * FROM CarDetails 
+            WHERE brand = booking_record.brand AND model = booking_record.model AND zip = booking_record.zip 
+            AND plate NOT IN (
+                SELECT plate FROM Assigns WHERE bid IN (
+                    SELECT bid FROM Bookings WHERE (sdate BETWEEN booking_record.sdate AND booking_record.sdate + booking_record.days) OR 
+                    (sdate + days BETWEEN booking_record.sdate AND booking_record.sdate + booking_record.days)
+                )
+            ) 
+            ORDER BY plate ASC
+        ) LOOP
+            INSERT INTO Assigns (bid, plate) VALUES (booking_record.bid, car_details_record.plate);
+            EXIT; -- Exit the loop once a car is assigned
+        END LOOP;
+    END LOOP;
 END;
 $$ LANGUAGE plpgsql;
-
 
 -- FUNCTION 1
 CREATE OR REPLACE FUNCTION compute_revenue (
   sdate DATE, edate DATE
 ) RETURNS NUMERIC AS $$
-  -- your code here
+DECLARE
+  booking_revenue NUMERIC;
+  driver_revenue NUMERIC;
+  car_cost NUMERIC;
+BEGIN
+  -- Compute booking revenue
+  SELECT SUM(CM.daily * B.days) INTO booking_revenue
+  FROM Bookings B
+  JOIN Assigns A ON B.bid = A.bid
+  JOIN CarModels CM ON B.model = CM.model
+  WHERE B.sdate <= edate AND B.sdate + B.days >= sdate;
+
+  -- Compute driver revenue
+  SELECT SUM((D.todate - D.fromdate + 1) * 10) INTO driver_revenue
+  FROM Drivers D
+  WHERE D.fromdate <= edate AND D.todate >= sdate;
+
+  -- Compute car cost
+  SELECT COUNT(DISTINCT A.plate) * 100 INTO car_cost
+  FROM Assigns A
+  JOIN Bookings B ON A.bid = B.bid
+  WHERE B.sdate <= edate AND B.sdate + B.days >= sdate;
+
+  -- Return total revenue
+  RETURN booking_revenue + driver_revenue - car_cost;
+END;
 $$ LANGUAGE plpgsql;
 
-
 -- FUNCTION 2
-CREATE OR REPLACE FUNCTION top_n_location (
-  n INT, sdate DATE, edate DATE
-) RETURNS TABLE(lname TEXT, revenue NUMERIC, rank INT) AS $$
-  -- your code here
+CREATE OR REPLACE FUNCTION top_n_location(n INT, sdate DATE, edate DATE) 
+RETURNS TABLE(lname TEXT, revenue NUMERIC, rank INT) AS $$
+BEGIN
+    RETURN QUERY (
+        WITH location_revenues AS (
+            SELECT L.lname AS lname, compute_revenue(sdate, edate) AS revenue
+            FROM Locations L
+        ),
+        ranked_locations AS (
+            SELECT location_revenues.lname, location_revenues.revenue, 
+                   (DENSE_RANK() OVER (ORDER BY location_revenues.revenue DESC))::integer AS rank
+            FROM location_revenues
+        )
+        SELECT ranked_locations.lname, ranked_locations.revenue, ranked_locations.rank
+        FROM ranked_locations
+        WHERE ranked_locations.rank <= n
+        ORDER BY ranked_locations.rank ASC, ranked_locations.lname ASC
+    );
+END;
 $$ LANGUAGE plpgsql;
