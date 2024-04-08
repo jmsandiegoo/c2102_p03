@@ -3,8 +3,8 @@ Group #73
 1. San Deigo John Michael Bautista
   - Triggers
   - Contribution B
-2. Name 2
-  - Contribution A
+2. Joshua Wee Ming-En
+  - Triggers
   - Contribution B
 */
 
@@ -78,51 +78,75 @@ BEGIN
   SELECT zip INTO employee_zip -- select zip as employee_zip?
   FROM Employees
   WHERE eid = NEW.eid;
+
 -- Retrieve zip of booking location
   SELECT zip INTO booking_zip
   FROM Bookings
   WHERE bid = NEW.bid;
+
 --Check if employee's location matches booking's location
-IF employee_zip <> booking_zip THEN
-  RAISE EXCEPTION 'Employee'
+  IF employee_zip <> booking_zip THEN
+    RAISE EXCEPTION 'Employee must be located in the same location as the booking;'
+  END IF;
 
-
-
-
-
-
-
-
-
-
-/*
-  Write your Routines Below
-    Comment out your routine if you cannot complete
-    the routine.
-    If any of your routine causes error (even those
-    that are incomplete), you may get 0 mark for P03.
-*/
-
--- PROCEDURE 1
-CREATE OR REPLACE PROCEDURE add_employees (
-  eids INT[], enames TEXT[], ephones INT[], zips INT[], pdvls TEXT[]
-) AS $$
--- add declarations here
-BEGIN
-  -- your code here
+  RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
+-- TRIGGER 4. The car assigned to the booking must be for the car models for the booking.
+CREATE TRIGGER check_car_model_assignment
+BEFORE INSERT ON Assigns
+FOR EACH ROW EXECUTE FUNCTION check_car_model_assignment_func();
 
--- PROCEDURE 2
-CREATE OR REPLACE PROCEDURE add_car (
-  brand   TEXT   , model  TEXT   , capacity INT  ,
-  deposit NUMERIC, daily  NUMERIC,
-  plates  TEXT[] , colors TEXT[] , pyears   INT[], zips INT[]
-) AS $$
--- add declarations here
+CREATE OR REPLACE FUNCTION check_car_model_assignment_func() RETURNS TRIGGER AS $$
 BEGIN
-  -- your code here
+  -- Check if the assigned car has the same brand and model as the booking
+  IF (SELECT brand || ' ' || model FROM CarDetails WHERE plate = NEW.plate) <> (SELECT brand || ' ' || model FROM Bookings WHERE bid = NEW.bid) THEN
+    RAISE EXCEPTION 'The assigned car must have the same brand and model as the booking.';
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+--TRIGGER 5. The car (i.e., CarDetails) assigned to the booking must be parked in the same location as the booking is for.
+CREATE TRIGGER check_car_location_assignment
+BEFORE INSERT ON Assigns
+FOR EACH ROW EXECUTE FUNCTION check_car_location_assignment_func();
+
+CREATE OR REPLACE FUNCTION check_car_location_assignment_func() RETURNS TRIGGER AS $$
+BEGIN
+  -- Check if the assigned car is parked in the same location as the booking
+  IF (SELECT zip FROM CarDetails WHERE plate = NEW.plate) <> (SELECT zip FROM Bookings WHERE bid = NEW.bid) THEN
+    RAISE EXCEPTION 'The assigned car must be parked in the same location as the booking.';
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- TRIGGER 6. Drivers must be hired within the start date and end date of a booking.
+CREATE TRIGGER check_driver_hiring_date
+BEFORE INSERT ON Hires
+FOR EACH ROW EXECUTE FUNCTION check_driver_hiring_date_func();
+
+CREATE OR REPLACE FUNCTION check_driver_hiring_date_func() RETURNS TRIGGER AS $$
+BEGIN
+  DECLARE
+      booking_start_date DATE;
+      booking_end_date DATE;
+  BEGIN
+      SELECT sdate, sdate + days INTO booking_start_date, booking_end_date
+      FROM Bookings
+      WHERE bid = NEW.bid;
+
+  -- Check if the hiring date of the driver overlaps with the booking schedule
+    IF (NEW.fromdate > booking_end_date) OR (NEW.todate < booking_start_date) THEN
+      RAISE EXCEPTION 'Drivers must be hired within the start date and end date of a booking.';
+    END IF;
+  END
+
+  RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
