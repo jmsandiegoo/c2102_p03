@@ -10,11 +10,7 @@ Group #73
 
 /* Write your Trigger Below */
 
--- TRIGGER 1. Drivers cannot be double-booked tested/working: ✅
-CREATE TRIGGER check_driver_not_double_booked
-BEFORE INSERT ON Hires
-FOR EACH ROW EXECUTE FUNCTION check_driver_not_double_booked_func();
-
+-- TRIGGER 1. Drivers cannot be double-booked. tested/working: ✅
 CREATE OR REPLACE FUNCTION check_driver_not_double_booked_func()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -22,7 +18,7 @@ DECLARE
 BEGIN
   -- query and check for existence of driver overlap bookings
   SELECT EXISTS (
-    SELECT 1 FROM Hires h 
+    SELECT 1 FROM Hires h
     WHERE h.eid = NEW.eid
     AND (
       NEW.fromdate BETWEEN h.fromdate AND h.todate
@@ -42,7 +38,7 @@ $$ LANGUAGE plpgsql;
 
 -- TRIGGER 2. Cars (ie CarDetails) cannot be double-booked.
 
-CREATE TRIGGER prevent_car_double_booking
+CREATE TRIGGER prevent_car_double_booking ✅
 BEFORE INSERT ON Assigns
 FOR EACH ROW EXECUTE FUNCTION check_car_not_double_booked_func();
 
@@ -51,10 +47,10 @@ DECLARE
     overlapping_count INT;
 BEGIN
   SELECT COUNT(*) INTO overlapping_count
-  FROM Assigns a, Bookins b
-  WHERE a.bid = b.bid AND a.plate = NEW.plate
-  AND b.sdate <= NEW.todate --checks if START of existing booking(b.sdate) is earlier than END of new assignment(NEW.todate), 
-  AND b.edate >= NEW.fromdate;   --checks if END of existing booking(b.edate) is later than START of new assignment(NEW.fromdate)
+  FROM Assigns a, Bookings b, Bookings new_b
+  WHERE a.bid = b.bid AND a.plate = NEW.plate AND NEW.bid = new_b.bid AND a.plate = NEW.plate
+  AND b.sdate <= new_b.sdate + new_b.days --checks if START of existing booking(b.sdate) is earlier than END of new assignment(new_b.edate), 
+  AND b.sdate + b.days >= new_b.sdate;   --checks if END of existing booking(b.edate) is later than START of new assignment(new_b.sdate)
 
   IF overlapping_count > 0 THEN
         RAISE EXCEPTION 'Car is already booked for another assignment during the specified period'; --decide to raise or fail silently, BOTH OK
@@ -65,14 +61,14 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- TRIGGER 3. During handover, the employee must be located in the same location the booking is for.
-CREATE TRIGGER enforce_employee_location
+CREATE TRIGGER enforce_employee_location ✅
 BEFORE INSERT ON Handover
 FOR EACH ROW EXECUTE FUNCTION check_employee_location();
 
 CREATE OR REPLACE FUNCTION check_employee_location() RETURNS TRIGGER AS $$
 DECLARE 
-  employee_zip INT
-  booking_zip INT;
+    employee_zip INT;
+    booking_zip INT;
 BEGIN
 -- Retrieve zip code of employee
   SELECT zip INTO employee_zip -- select zip as employee_zip?
@@ -86,7 +82,7 @@ BEGIN
 
 --Check if employee's location matches booking's location
   IF employee_zip <> booking_zip THEN
-    RAISE EXCEPTION 'Employee must be located in the same location as the booking;'
+    RAISE EXCEPTION 'Employee must be located in the same location as the booking;';
   END IF;
 
   RETURN NEW;
@@ -94,7 +90,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- TRIGGER 4. The car assigned to the booking must be for the car models for the booking.
-CREATE TRIGGER check_car_model_assignment
+CREATE TRIGGER check_car_model_assignment ✅
 BEFORE INSERT ON Assigns
 FOR EACH ROW EXECUTE FUNCTION check_car_model_assignment_func();
 
@@ -109,7 +105,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
---TRIGGER 5. The car (i.e., CarDetails) assigned to the booking must be parked in the same location as the booking is for.
+--TRIGGER 5. The car (i.e., CarDetails) assigned to the booking must be parked in the same location as the booking is for.✅
 CREATE TRIGGER check_car_location_assignment
 BEFORE INSERT ON Assigns
 FOR EACH ROW EXECUTE FUNCTION check_car_location_assignment_func();
@@ -125,33 +121,31 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- TRIGGER 6. Drivers must be hired within the start date and end date of a booking.
+-- TRIGGER 6. Drivers must be hired within the start date and end date of a booking.✅
 CREATE TRIGGER check_driver_hiring_date
 BEFORE INSERT ON Hires
 FOR EACH ROW EXECUTE FUNCTION check_driver_hiring_date_func();
 
 CREATE OR REPLACE FUNCTION check_driver_hiring_date_func() RETURNS TRIGGER AS $$
+DECLARE
+    booking_start_date DATE; 
+    booking_end_date DATE;  --new.fromdate = 0103, new.todate = 0120
 BEGIN
-  DECLARE
-      booking_start_date DATE;
-      booking_end_date DATE;
-  BEGIN
-      SELECT sdate, sdate + days INTO booking_start_date, booking_end_date
-      FROM Bookings
-      WHERE bid = NEW.bid;
+  SELECT sdate, sdate + days INTO booking_start_date, booking_end_date 
+  FROM Bookings --sdate = 0103, edate = 0105
+  WHERE bid = NEW.bid;
 
   -- Check if the hiring date of the driver overlaps with the booking schedule
-    IF (NEW.fromdate > booking_end_date) OR (NEW.todate < booking_start_date) THEN
-      RAISE EXCEPTION 'Drivers must be hired within the start date and end date of a booking.';
-    END IF;
-  END
+  IF (NEW.todate > booking_end_date) OR (NEW.fromdate < booking_start_date) THEN
+    RAISE EXCEPTION 'Drivers must be hired within the start date and end date of a booking.';
+  END IF;
 
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
 
---PROCEDURE 1 Add Employees
+--PROCEDURE 1 Add Employees ✅
 CREATE OR REPLACE PROCEDURE add_employees (
     eids INT[], 
     enames TEXT[], 
@@ -164,18 +158,18 @@ DECLARE
 BEGIN
     FOR i IN 1..array_length(eids, 1)
     LOOP
-        INSERT INTO Employee (eid, ename, ephone, zip) 
+        INSERT INTO Employees (eid, ename, ephone, zip) 
         VALUES (eids[i], enames[i], ephones[i], zips[i]);
 
         IF pdvls[i] IS NOT NULL THEN
-            INSERT INTO Driver (eid, pdvl) 
+            INSERT INTO Drivers (eid, pdvl) 
             VALUES (eids[i], pdvls[i]);
         END IF;
     END LOOP;
 END;
 $$ LANGUAGE plpgsql;
 
---PROCEDURE 2 Add Car Model
+--PROCEDURE 2 Add Car Model ✅
 CREATE OR REPLACE PROCEDURE add_car (
     brand TEXT , model TEXT , capacity INT,
     deposit NUMERIC , daily NUMERIC ,
@@ -183,42 +177,44 @@ CREATE OR REPLACE PROCEDURE add_car (
 DECLARE
     i INT;
 BEGIN
-    INSERT INTO CarModel (brand, model, capacity, deposit, daily) 
+    INSERT INTO CarModels (brand, model, capacity, deposit, daily) 
     VALUES (brand, model, capacity, deposit, daily);
 
     FOR i IN 1..array_length(plates, 1)
     LOOP
         INSERT INTO CarDetails (plate, color, pyear, brand, model, zip) 
-        VALUES (plates[i], colors[i], pyears[i], brand, model, zips[i],);
+        VALUES (plates[i], colors[i], pyears[i], brand, model, zips[i]);
     END LOOP;
 END;
 $$ LANGUAGE plpgsql;
 
 -- PROCEDURE 3 ## how to calculate cost?
 CREATE OR REPLACE PROCEDURE return_car (
-  bid INT, eid INT
+  p_bid INT, eid INT
 ) AS $$
+DECLARE
   booking_record RECORD;
   car_model_record RECORD;
   cost NUMERIC;
 BEGIN
     -- Retrieve the booking details
-    SELECT INTO booking_record * FROM Bookings WHERE bid = bid;
+    SELECT INTO booking_record * FROM Bookings WHERE Bookings.bid = p_bid;
 
   -- Retrieve the car model details
-    SELECT INTO car_model_record * FROM CarModel WHERE brand = booking_record.brand AND model = booking_record.model;
+    SELECT INTO car_model_record * FROM CarModels WHERE CarModels.brand = booking_record.brand 
+    AND CarModels.model = booking_record.model;
 
     -- Calculate the cost
     cost := (car_model_record.daily * booking_record.days) - car_model_record.deposit;
 
     -- If cost is positive and ccnum is not given, retrieve it from the booking
     IF cost > 0 AND booking_record.ccnum IS NULL THEN
-        booking_record.ccnum := (SELECT ccnum FROM Bookings WHERE bid = bid);
+        booking_record.ccnum := (SELECT ccnum FROM Bookings WHERE Bookings.bid = p_bid);
     END IF;
 
     -- Update the Returned table
-    INSERT INTO Returned (bid, eid, ccnum, cost) 
-    VALUES (bid, eid, booking_record.ccnum, cost);
+    INSERT INTO Returned (p_bid, eid, ccnum, cost) 
+    VALUES (p_bid, eid, booking_record.ccnum, cost);
 END;
 $$ LANGUAGE plpgsql;
 
