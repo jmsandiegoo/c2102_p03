@@ -211,14 +211,47 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
--- PROCEDURE 3
+-- PROCEDURE 3 test/working: ✅
 CREATE OR REPLACE PROCEDURE return_car (
-  bid INT, eid INT
+  p_bid INT, p_eid INT
 ) AS $$
--- add declarations here
+DECLARE
+  booking_record RECORD;
+  booking_deposit NUMERIC;
+  booking_daily_rate NUMERIC;
+  return_cost NUMERIC;
+  return_ccnum TEXT;
 BEGIN
-  -- your code here
+  -- get the booking record
+  SELECT * INTO booking_record
+  FROM Bookings b
+  WHERE b.bid = p_bid;
+
+  IF NOT FOUND THEN
+    RAISE NOTICE 'return_car failed: Booking w/ bid % could not be found', p_bid;
+    RETURN;
+  END IF;
+
+  -- get the deposit and daily
+  SELECT cm.deposit, cm.daily INTO booking_deposit, booking_daily_rate
+  FROM CarModels cm
+  WHERE cm.brand = booking_record.brand
+  AND cm.model = booking_record.model;
+
+  IF NOT FOUND THEN
+    RAISE NOTICE 'return_car failed: Car Model w/ brand % and model % could not be found', booking_record.brand, booking_record.model;
+    RETURN;
+  END IF;
+
+  -- calculate cost
+  return_cost := (booking_daily_rate * booking_record.days) - booking_deposit;
+
+  IF return_cost > 0 THEN
+    return_ccnum := booking_record.ccnum;
+  END IF;
+
+  INSERT INTO Returned (bid, eid, ccnum, cost)
+  VALUES (p_bid, p_eid, return_ccnum, return_cost);
 END;
 $$ LANGUAGE plpgsql;
 

@@ -110,7 +110,6 @@ CREATE TABLE Hires (
 );
 
 -- test data
-
 INSERT INTO Customers (email, dob, address, phone, fsname, lsname) VALUES
 ('john.doe@example.com', '1985-07-12', '123 Elm Street', 88888888, 'John', 'Doe'),
 ('jane.doe@example.com', '1990-05-24', '456 Oak Avenue', 87777777, 'Jane', 'Doe');
@@ -165,7 +164,6 @@ INSERT INTO Hires (bid, eid, fromdate, todate, ccnum) VALUES
 (6, 1, '2024-01-02', '2024-01-06', '1111222233334444'),
 (7, 1, '2024-01-06', '2024-01-07', '1111222233334444');
 
-
 -- trigger 4 test
 INSERT INTO Assigns (bid, plate) VALUES
 (3, 'SJD1234');
@@ -184,3 +182,6 @@ CALL add_car(
   'Toyota', 'Prius', 5, 200.00, 50.00, 
   ARRAY['ABC4200', 'ABC4201'], ARRAY['Grey', 'White'], 
   ARRAY[2021, 2022], ARRAY[12345, 67890]);
+
+-- procedure 3 test
+INSERT INTO
